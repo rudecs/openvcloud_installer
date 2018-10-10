@@ -23,3 +23,10 @@ spec:
         ports:
         - containerPort: 9500
           protocol: UDP
+
+      livenessProbe:
+        tcpSocket:
+          port: 9500
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
