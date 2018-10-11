@@ -63,13 +63,7 @@ WantedBy=multi-user.target
                 'connections':{
                     "agentcontroller": "main",
                     "osis": "jsagent",
-                },
-                'grid': {
-                    "id": str(self.config.gid),
-                    "node": {
-                        "roles":  ",".join(self.config.roles),
-                    },
-                },
+                }
             },
             'servicename': 'jsagent',
             'daemonpath': '/usr/local/bin/jspython',
@@ -136,19 +130,6 @@ WantedBy=multi-user.target
         self.write_config(self.redis)
 
     def install_jsagent(self):
-        grid = {
-            "config": {
-                'id': int(self.config.grid_id),
-                'node': {
-                    'id': 0,
-                    'machineguid': j.application.getUniqueMachineId(),
-                    'roles': self.config.roles
-                },
-            },
-            "servicename": "system",
-            "instance": 'grid'
-        }
-        self.write_config(grid)
         self.write_config(self.jsagent)
         # reload system config / whoAmI
         j.application.loadConfig()
@@ -411,7 +392,8 @@ Pin-Priority: 1000
                 change = True
                 roles.append(role)
         if change:
-            j.application.config.set('grid.node.roles', roles)
+            j.application.config['grid']['node']['roles'] = roles
+            j.core.config.set('system', 'grid', j.application.config['grid'])
             self.restart_service('openvcloud_jsagent')
         self.restart_service('openvcloud_nginx')
 
