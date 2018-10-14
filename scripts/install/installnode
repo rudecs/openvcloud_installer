@@ -45,7 +45,7 @@ WantedBy=multi-user.target
                 "name": "main",
                 "ip": "0.0.0.0",
                 "port": "9999",
-                "maxram": "200",
+                "maxram": "100",
                 "disk": True,
                 "unixsocket": False,
                 "passwd": "",
@@ -338,12 +338,12 @@ class StorageNode(Node):
     
     def prepare_config(self):
         super(StorageNode, self).prepare_config()
-        self.data_storage = {
-            "param.rootpasswd": self.config.password,
-            "param.master.addr": "",
-            "param.grid.id": self.config.gid,
-            }
-        self.redis['config']['instance.param.maxram'] = 200
+        # self.data_storage = {
+        #     "param.rootpasswd": self.config.password,
+        #     "param.master.addr": "",
+        #     "param.grid.id": self.config.gid,
+        #     }
+        self.redis['config']['maxram'] = 200
     
     def install(self):
         self.install_cb_storagenode_aio()
@@ -373,9 +373,8 @@ Pin-Priority: 1000
                 change = True
                 roles.append(role)
         if change:
-            grid_conf = j.application.config['grid']
-            grid_conf['node']['roles'] = roles
-            j.core.config.set('system', 'grid', grid_conf)
+            j.application.config['grid']['node']['roles'] = roles
+            j.core.config.set('system', 'grid', j.application.config['grid'])
             self.restart_service('openvcloud_jsagent')
 
     def install_cb_storagedriver_aio(self):
@@ -457,10 +456,10 @@ Pin-Priority: 1000
             oauth_authorize_uri = os.path.join(self.iyourl, "v1/oauth/authorize")
 
             data_oauth = {
-                "oauth.id": self.config.client_id,
-                "oauth.secret": apikey["secret"],
-                "oauth.authorize_uri": oauth_authorize_uri,
-                "oauth.token_uri": oauth_token_uri,
+                "id": self.config.client_id,
+                "secret": apikey["secret"],
+                "authorize_uri": oauth_authorize_uri,
+                "token_uri": oauth_token_uri,
             }
 
             def _configure(data_oauth):
@@ -482,23 +481,24 @@ Pin-Priority: 1000
                                 'oauth2':
                                 {
                                     'mode': 'remote',
-                                    'authorize_uri': data_oauth.get('instance.oauth.authorize_uri'),
-                                    'token_uri': data_oauth.get('instance.oauth.token_uri'),
+                                    'authorize_uri': data_oauth.get('authorize_uri'),
+                                    'token_uri': data_oauth.get('token_uri'),
                                     'client_id': clientid,
-                                    'client_secret': data_oauth.get('instance.oauth.secret'),
+                                    'client_secret': data_oauth.get('secret'),
                                     'scope': 'user:memberof:{}.ovs_admin'.format(clientid)
                                 }
                                 }
                     setdata('/ovs/framework/webapps', json.dumps(config))
 
                 j.system.platform.ubuntu.restartService('ovs-webapp-api')
+            _configure(data_oauth)
             openvstorage_oauth = {
-            "config": {
+            "config": 
                 data_oauth
-                },
+                ,
                 "domain": 'openvcloud',
                 "servicename": "openvstorage_oauth",
-                "instane": "main"
+                "instance": "main"
             }
 
             self.write_config(openvstorage_oauth)
