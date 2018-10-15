@@ -3,6 +3,7 @@ from JumpScale import j
 import requests
 import os
 import json
+import time
 
 class Node(object):
     """ Install basic packages on a node """
@@ -15,31 +16,9 @@ class Node(object):
 
     def install_packages(self):
         j.do.execute('apt-get update')
-        j.do.execute('apt-get install -y redis-server nginx openvswitch-switch')
+        j.do.execute('apt-get install -y redis-server openvswitch-switch')
 
     def prepare_config(self):
-        self.nginx = {
-            "servicename": 'nginx'
-        }
-        self.nginx_service= """
-[Unit]
-Description=A high performance web server and a reverse proxy server
-After=network.target
-
-[Service]
-Type=forking
-PIDFile=/run/nginx.pid
-ExecStartPre=/usr/sbin/nginx -t -c /etc/nginx/nginx.conf -q -g 'daemon on; master_process on;'
-ExecStart=/usr/sbin/nginx -c /etc/nginx/nginx.conf -g 'daemon on; master_process on;'
-ExecReload=/usr/sbin/nginx -c /etc/nginx/nginx.conf -g 'daemon on; master_process on;' -s reload
-ExecStop=-/sbin/start-stop-daemon --quiet --stop --retry QUIT/5 --pidfile /run/nginx.pid
-TimeoutStopSec=5
-KillMode=mixed
-
-[Install]
-WantedBy=multi-user.target
-
-"""
         self.redis = {
             'config': {
                 "name": "main",
@@ -100,21 +79,13 @@ WantedBy=multi-user.target
                 "servicename": "agentcontroller_client",
                 "instance": 'main'
             }
-        self.services.extend([self.redis, self.jsagent, self.nginx])
+        self.services.extend([self.redis, self.jsagent])
 
     def install(self):
-        self.install_nginx()
         self.install_redis()
         self.install_osis_client()
         self.install_agentcontroller_client()
         self.install_jsagent()
-
-    def install_nginx(self):
-        j.do.writeFile('/etc/systemd/system/openvcloud_nginx.service', self.nginx_service)
-        j.do.execute('systemctl stop nginx')
-        j.do.execute('systemctl disable nginx')
-        j.do.execute('systemctl start openvcloud_nginx.service')
-        j.do.execute('systemctl enable openvcloud_nginx.service')
 
     def install_redis(self):
         config = self.redis['config']
@@ -216,21 +187,73 @@ class ComputeNode(Node):
             'pwd': "/opt/jumpscale7/apps/libvirtlistener/",
             'instance': "main",
             }
+        self.vfwnode = {
+            "config":{
+            "netrange_internal": "10.199.0.0/22",
+            "passwd": "Dct007",
+            "newpasswd": "Dct007",
+            "login" :"vscalers",
+            "ip" :"10.199.3.254",
+            },
+            "servicename": "routeros",
+            "instance": "main"
+        }
+
         self.services.extend([self.vncproxy, self.libvirtlistener])
+
+    def install_vfwnode(self):
+        self.write_config(self.vfwnode)
 
     def install_packages(self):
         super(ComputeNode, self).install_packages()
-        j.do.execute('apt-get install -y libvirt-bin python-libvirt virtinst python-pexpect ovmf openvswitch-switch')
+        j.do.execute('apt-get install -y qemu nginx libvirt-bin python-libvirt virtinst python-pexpect ovmf openvswitch-switch openvswitch-common genisoimage qemu-kvm')
+
+    def configure(self):
+        contents = "\n  /mnt/vmstor/** rw,\n  /mnt/vmstor/**/** rw,"
+        j.system.fs.writeFile('/etc/apparmor.d/abstractions/libvirt-qemu', contents, True)
+        txt = j.codetools.getTextFileEditor('/etc/apparmor.d/abstractions/libvirt-qemu')
+        txt.appendReplaceLine('/sys/devices/system/cpu', '  /sys/devices/system/cpu/** r,')
+        txt.save()
+        if j.system.platform.ubuntu.serviceExists('apparmor'):
+            j.system.platfor.ubuntu.reloadService('apparmor')
+
+        ccl = j.clients.osis.getNamespace('cloudbroker')
+
+        oob_interface = 'backplane1'
+        ipaddress = j.system.net.getIpAddress(oob_interface)[0][0]
+
+        # create a new stack:
+        # reload whoAmI and wait till nid is set agent might stil lbe starting itself
+        start = time.time()
+        timeout = 60
+        while j.application.whoAmI.nid == 0 or time.time() > start + timeout:
+            time.sleep(3)
+            j.application.loadConfig()
+            j.application.initWhoAmI() 
+        if not ccl.stack.count({'referenceId': str(j.application.whoAmI.nid), 'gid': j.application.whoAmI.gid}):
+            stack = dict()
+            stack['id'] = None
+            stack['apiUrl'] = 'qemu+ssh://%s/system' % ipaddress
+            stack['descr'] = 'libvirt node'
+            stack['type'] = 'LIBVIRT'
+            stack['status'] = 'ENABLED'
+            stack['name'] = j.system.net.getHostname()
+            stack['gid'] = j.application.whoAmI.gid
+            stack['referenceId'] = str(j.application.whoAmI.nid)
+            ccl.stack.set(stack)
+
         
     def install(self):
         super(ComputeNode, self).install()
         if not self.config.update:
             self.install_packages()
+        self.configure()
         self.install_portal_client()
         self.install_vncproxy()
         self.install_libvirtlistener()
         self.install_scaleout_network()
         self.install_cb_cpunode_aio()
+        self.install_vfwnode()
 
     def install_vncproxy(self):
         self.register_service(self.vncproxy)
@@ -315,7 +338,7 @@ class ComputeNode(Node):
     def install_cb_cpunode_aio(self):
         roles = j.application.config['grid']['node'].get('roles', [])
         change = False
-        for role in ['cpunode']:
+        for role in ['cpunode', 'vfw']:
             if role not in roles:
                 change = True
                 roles.append(role)
@@ -325,7 +348,7 @@ class ComputeNode(Node):
             j.core.config.set('system', 'grid', grid_conf)
 
             self.restart_service('openvcloud_jsagent')
-        self.restart_service('openvcloud_nginx')
+        self.restart_service('nginx')
 
 
 class StorageNode(Node):
@@ -362,7 +385,7 @@ Pin-Priority: 1000
             j.do.writeFile("/etc/apt/preferences", content)
             j.do.execute("apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0F18F826B6183F53")
             j.do.execute("apt-get update")
-        j.do.execute("apt-get install -y genisoimage qemu-utils openvswitch-switch python-psutil openvstorage-health-check")
+        j.do.execute("apt-get install -y genisoimage nginx qemu-utils openvswitch-switch python-psutil openvstorage-health-check")
 
 
     def install_cb_storagenode_aio(self):
@@ -394,7 +417,7 @@ Pin-Priority: 1000
             j.application.config['grid']['node']['roles'] = roles
             j.core.config.set('system', 'grid', j.application.config['grid'])
             self.restart_service('openvcloud_jsagent')
-        self.restart_service('openvcloud_nginx')
+        self.restart_service('nginx')
 
     def configure_iyo_api_key(self, apikey):
         label = apikey["label"]
@@ -531,7 +554,7 @@ if __name__ == "__main__":
     parser.add_argument('--update', help='Update', action='store_true')                        
 
     config = parser.parse_args()
-
+    
     if 'cpu' in config.roles:
         node = ComputeNode(config)
     elif 'storage' in config.roles:
