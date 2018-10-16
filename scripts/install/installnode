@@ -533,7 +533,18 @@ Pin-Priority: 1000
             }
 
             self.write_config(openvstorage_oauth)
+class ConvergedNode(ComputeNode, StorageNode):
+    def __init__(self, config):
+        ComputeNode.__init__(self, config)
+        StorageNode.__init__(self, config)
 
+    def install(self):
+        ComputeNode.install(self)
+        StorageNode.install(self)
+
+    def clean(self):
+        super(ConvergedNode, self).clean()
+        
 
 if __name__ == "__main__":
 
@@ -584,6 +595,8 @@ if __name__ == "__main__":
     if "cpu" in config.roles:
         node = ComputeNode(config)
     elif "storage" in config.roles:
+        node = StorageNode(config)
+    elif "converged" in config.roles:
         node = StorageNode(config)
     else:
         node = Node(config)
