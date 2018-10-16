@@ -296,6 +296,7 @@ class ComputeNode(Node):
             j.system.ovsnetconfig.configureStaticAddress(
                 network["name"], network["ipaddr"], mtu=network["mtu"]
             )
+            j.system.process.execute("ifup {}".format(network["name"]))
 
         conn = libvirt.open()
         networks = conn.listNetworks()
