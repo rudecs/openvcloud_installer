@@ -157,15 +157,20 @@ class ComputeNode(Node):
             "gwmgmt_vlan": self.config.gwmgmt_vlan,
             "gwmgmt_ip": self.config.gwmgmt_ip,
         }
-        self.data_net = {
-            "netconfig.public_backplane.interfacename": "backplane1",
-            "netconfig.gw_mgmt_backplane.interfacename": "backplane1",
-            "netconfig.vxbackend.interfacename": "backplane1",
-            "netconfig.gw_mgmt.vlanid": self.netinfo["gwmgmt_vlan"],
-            "netconfig.vxbackend.vlanid": self.netinfo["vxbackend_vlan"],
-            "netconfig.gw_mgmt.ipaddr": self.netinfo["gwmgmt_ip"],
-            "netconfig.vxbackend.ipaddr": self.netinfo["vxbackend_ip"],
-        }
+        self.data_net = [
+            {
+                "name": "gw_mgmt",
+                "vlan": self.netinfo["gwmgmt_vlan"],
+                "ipaddr": self.netinfo["gwmgmt_ip"],
+                "mtu": 1500,
+            },
+            {
+                "name": "vxbackend",
+                "vlan": self.netinfo["vxbackend_vlan"],
+                "ipaddr": self.netinfo["vxbackend_ip"],
+                "mtu": 2000,
+            },
+        ]
 
         self.data_cpu = {
             "rootpasswd": self.config.password,
@@ -283,20 +288,14 @@ class ComputeNode(Node):
 
         nics = j.system.net.getNics()
 
-        for network in ("gw_mgmt", "vxbackend"):
-            if network not in nics:
-                backplane = self.data_net[
-                    "netconfig.{}_backplane.interfacename".format(network)
-                ]
-                vlan = self.data_net["netconfig.{}.vlanid".format(network)]
-                j.system.ovsnetconfig.newVlanBridge(network, backplane, vlan, 1500)
-            key = "netconfig.%s.ipaddr" % network
-            if self.data_net.get(key):
-                ip = self.data_net[key].strip()
-                if ip:
-                    mtu = None if network != "vxbackend" else 2000
-                    j.system.ovsnetconfig.configureStaticAddress(network, ip, mtu=mtu)
-
+        for network in self.data_net:
+            if network["name"] not in nics:
+                j.system.ovsnetconfig.newVlanBridge(
+                    network["name"], "backplane1", network["vlan"], network["mtu"]
+                )
+            j.system.ovsnetconfig.configureStaticAddress(
+                network["name"], network["ipaddr"], mtu=network["mtu"]
+            )
 
         conn = libvirt.open()
         networks = conn.listNetworks()
