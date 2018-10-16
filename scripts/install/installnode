@@ -5,8 +5,10 @@ import os
 import json
 import time
 
+
 class Node(object):
     """ Install basic packages on a node """
+
     def __init__(self, config, update=False):
         self.services = []
         self.config = config
@@ -15,12 +17,12 @@ class Node(object):
             self.install_packages()
 
     def install_packages(self):
-        j.do.execute('apt-get update')
-        j.do.execute('apt-get install -y redis-server openvswitch-switch')
+        j.do.execute("apt-get update")
+        j.do.execute("apt-get install -y redis-server openvswitch-switch")
 
     def prepare_config(self):
         self.redis = {
-            'config': {
+            "config": {
                 "name": "main",
                 "ip": "0.0.0.0",
                 "port": "9999",
@@ -29,27 +31,22 @@ class Node(object):
                 "unixsocket": False,
                 "passwd": "",
             },
-            'servicename': 'redis',
-            'instance': 'system',
-            'domain': 'jumpscale',
-            'daemonpath': '/usr/bin/redis-server',
-            'args': '/opt/jumpscale7/var/redis/redis__system/redis.conf',
-            'pwd': '/opt/jumpscale7'
+            "servicename": "redis",
+            "instance": "system",
+            "domain": "jumpscale",
+            "daemonpath": "/usr/bin/redis-server",
+            "args": "/opt/jumpscale7/var/redis/redis__system/redis.conf",
+            "pwd": "/opt/jumpscale7",
         }
 
         self.jsagent = {
-            'config': {
-                'connections':{
-                    "agentcontroller": "main",
-                    "osis": "jsagent",
-                }
-            },
-            'servicename': 'jsagent',
-            'daemonpath': '/usr/local/bin/jspython',
-            'args': 'jsagent.py -i main',
-            'pwd': "/opt/jumpscale7/apps/jsagent/",
-            'instance': 'main',
-            'domain': 'jumpscale',
+            "config": {"connections": {"agentcontroller": "main", "osis": "jsagent"}},
+            "servicename": "jsagent",
+            "daemonpath": "/usr/local/bin/jspython",
+            "args": "jsagent.py -i main",
+            "pwd": "/opt/jumpscale7/apps/jsagent/",
+            "instance": "main",
+            "domain": "jumpscale",
         }
 
         self.osis_client_main = {
@@ -59,14 +56,15 @@ class Node(object):
                 "passwd": self.config.password,
                 "port": 5544,
             },
-                "domain": 'jumpscale',
-                "servicename": "osis_client",
-                "instance": "main"
+            "domain": "jumpscale",
+            "servicename": "osis_client",
+            "instance": "main",
         }
 
         import copy
+
         self.osis_client_jsagent = copy.deepcopy(self.osis_client_main)
-        self.osis_client_jsagent.update({'instance': 'jsagent'})
+        self.osis_client_jsagent.update({"instance": "jsagent"})
 
         self.agent_controller_client = {
             "config": {
@@ -74,11 +72,11 @@ class Node(object):
                 "login": "node",
                 "passwd": "",
                 "port": 4444,
-                },
-                "domain": 'jumpscale',
-                "servicename": "agentcontroller_client",
-                "instance": 'main'
-            }
+            },
+            "domain": "jumpscale",
+            "servicename": "agentcontroller_client",
+            "instance": "main",
+        }
         self.services.extend([self.redis, self.jsagent])
 
     def install(self):
@@ -88,15 +86,15 @@ class Node(object):
         self.install_jsagent()
 
     def install_redis(self):
-        config = self.redis['config']
+        config = self.redis["config"]
         j.clients.redis.configureInstance(
-            "{}__{}".format(self.redis['servicename'], self.redis['instance']),
-            ip=config['ip'],
-            port=config['port'],
-            maxram=config['maxram'],
+            "{}__{}".format(self.redis["servicename"], self.redis["instance"]),
+            ip=config["ip"],
+            port=config["port"],
+            maxram=config["maxram"],
             appendonly=False,
-            unixsocket=config['unixsocket']
-            )
+            unixsocket=config["unixsocket"],
+        )
         self.register_service(self.redis)
         self.write_config(self.redis)
 
@@ -106,29 +104,35 @@ class Node(object):
         j.application.loadConfig()
         self.register_service(self.jsagent)
 
-
     def install_osis_client(self):
         self.write_config(self.osis_client_main)
         self.write_config(self.osis_client_jsagent)
-    
+
     def install_agentcontroller_client(self):
         self.write_config(self.agent_controller_client)
 
     def register_service(self, config):
-        j.system.platform.ubuntu.serviceInstall("openvcloud_{}".format(config['servicename']), config['daemonpath'], config['args'], pwd=config['pwd'])
-        j.system.platform.ubuntu.startService("openvcloud_{}".format(config['servicename']))
+        j.system.platform.ubuntu.serviceInstall(
+            "openvcloud_{}".format(config["servicename"]),
+            config["daemonpath"],
+            config["args"],
+            pwd=config["pwd"],
+        )
+        j.system.platform.ubuntu.startService(
+            "openvcloud_{}".format(config["servicename"])
+        )
 
     def restart_service(self, servicename):
         j.system.platform.ubuntu.startService(servicename)
 
     def write_config(self, data):
-        j.core.config.set(data['servicename'], data['instance'], data.get('config', {}))
+        j.core.config.set(data["servicename"], data["instance"], data.get("config", {}))
 
     def clean(self):
         for service in self.services:
-            j.system.platform.ubuntu.serviceUninstall('openvcloud_{}'.format(service['servicename']))
-        
-
+            j.system.platform.ubuntu.serviceUninstall(
+                "openvcloud_{}".format(service["servicename"])
+            )
 
 
 class ComputeNode(Node):
@@ -139,20 +143,20 @@ class ComputeNode(Node):
     def prepare_config(self):
         super(ComputeNode, self).prepare_config()
         self.vncproxy = {
-            'domain': 'openvcloud',
-            'servicename': 'vncproxy',
-            'daemonpath': '/usr/local/bin/jspython',
-            'args': 'websockify_cs --web /opt/jumpscale7/apps/vncproxy --portal-client main 8091',
-            'pwd': "/opt/jumpscale7/apps/vncproxy/utils/",
-            'instance': "main"
-            }
+            "domain": "openvcloud",
+            "servicename": "vncproxy",
+            "daemonpath": "/usr/local/bin/jspython",
+            "args": "websockify_cs --web /opt/jumpscale7/apps/vncproxy --portal-client main 8091",
+            "pwd": "/opt/jumpscale7/apps/vncproxy/utils/",
+            "instance": "main",
+        }
 
         self.netinfo = {
-                    "vxbackend_vlan": self.config.vxbackend_vlan,
-                    "vxbackend_ip": self.config.vxbackend_ip,
-                    "gwmgmt_vlan": self.config.gwmgmt_vlan,
-                    "gwmgmt_ip": self.config.gwmgmt_ip,
-                }
+            "vxbackend_vlan": self.config.vxbackend_vlan,
+            "vxbackend_ip": self.config.vxbackend_ip,
+            "gwmgmt_vlan": self.config.gwmgmt_vlan,
+            "gwmgmt_ip": self.config.gwmgmt_ip,
+        }
         self.data_net = {
             "netconfig.public_backplane.interfacename": "backplane1",
             "netconfig.gw_mgmt_backplane.interfacename": "backplane1",
@@ -161,7 +165,7 @@ class ComputeNode(Node):
             "netconfig.vxbackend.vlanid": self.netinfo["vxbackend_vlan"],
             "netconfig.gw_mgmt.ipaddr": self.netinfo["gwmgmt_ip"],
             "netconfig.vxbackend.ipaddr": self.netinfo["vxbackend_ip"],
-            }
+        }
 
         self.data_cpu = {
             "rootpasswd": self.config.password,
@@ -175,28 +179,28 @@ class ComputeNode(Node):
                 "addr": self.config.fqdn,
                 "port": 443,
                 "secret": self.config.password,
-                },
-            "domain": 'jumpscale',
+            },
+            "domain": "jumpscale",
             "servicename": "portal_client",
-            "instance": 'main',
-            }
+            "instance": "main",
+        }
         self.libvirtlistener = {
-            'servicename': 'libvirtlistener',
-            'daemonpath': '/usr/local/bin/jspython',
-            'args': 'libvirtlistener.py',
-            'pwd': "/opt/jumpscale7/apps/libvirtlistener/",
-            'instance': "main",
-            }
+            "servicename": "libvirtlistener",
+            "daemonpath": "/usr/local/bin/jspython",
+            "args": "libvirtlistener.py",
+            "pwd": "/opt/jumpscale7/apps/libvirtlistener/",
+            "instance": "main",
+        }
         self.vfwnode = {
-            "config":{
-            "netrange_internal": "10.199.0.0/22",
-            "passwd": "Dct007",
-            "newpasswd": "Dct007",
-            "login" :"vscalers",
-            "ip" :"10.199.3.254",
+            "config": {
+                "netrange_internal": "10.199.0.0/22",
+                "passwd": "Dct007",
+                "newpasswd": "Dct007",
+                "login": "vscalers",
+                "ip": "10.199.3.254",
             },
             "servicename": "routeros",
-            "instance": "main"
+            "instance": "main",
         }
 
         self.services.extend([self.vncproxy, self.libvirtlistener])
@@ -206,20 +210,26 @@ class ComputeNode(Node):
 
     def install_packages(self):
         super(ComputeNode, self).install_packages()
-        j.do.execute('apt-get install -y qemu nginx libvirt-bin python-libvirt virtinst python-pexpect ovmf openvswitch-switch openvswitch-common genisoimage qemu-kvm')
+        j.do.execute(
+            "apt-get install -y qemu nginx libvirt-bin python-libvirt virtinst python-pexpect ovmf openvswitch-switch openvswitch-common genisoimage qemu-kvm"
+        )
 
     def configure(self):
         contents = "\n  /mnt/vmstor/** rw,\n  /mnt/vmstor/**/** rw,"
-        j.system.fs.writeFile('/etc/apparmor.d/abstractions/libvirt-qemu', contents, True)
-        txt = j.codetools.getTextFileEditor('/etc/apparmor.d/abstractions/libvirt-qemu')
-        txt.appendReplaceLine('/sys/devices/system/cpu', '  /sys/devices/system/cpu/** r,')
+        j.system.fs.writeFile(
+            "/etc/apparmor.d/abstractions/libvirt-qemu", contents, True
+        )
+        txt = j.codetools.getTextFileEditor("/etc/apparmor.d/abstractions/libvirt-qemu")
+        txt.appendReplaceLine(
+            "/sys/devices/system/cpu", "  /sys/devices/system/cpu/** r,"
+        )
         txt.save()
-        if j.system.platform.ubuntu.serviceExists('apparmor'):
-            j.system.platfor.ubuntu.reloadService('apparmor')
+        if j.system.platform.ubuntu.serviceExists("apparmor"):
+            j.system.platfor.ubuntu.reloadService("apparmor")
 
-        ccl = j.clients.osis.getNamespace('cloudbroker')
+        ccl = j.clients.osis.getNamespace("cloudbroker")
 
-        oob_interface = 'backplane1'
+        oob_interface = "backplane1"
         ipaddress = j.system.net.getIpAddress(oob_interface)[0][0]
 
         # create a new stack:
@@ -229,20 +239,24 @@ class ComputeNode(Node):
         while j.application.whoAmI.nid == 0 or time.time() > start + timeout:
             time.sleep(3)
             j.application.loadConfig()
-            j.application.initWhoAmI() 
-        if not ccl.stack.count({'referenceId': str(j.application.whoAmI.nid), 'gid': j.application.whoAmI.gid}):
+            j.application.initWhoAmI()
+        if not ccl.stack.count(
+            {
+                "referenceId": str(j.application.whoAmI.nid),
+                "gid": j.application.whoAmI.gid,
+            }
+        ):
             stack = dict()
-            stack['id'] = None
-            stack['apiUrl'] = 'qemu+ssh://%s/system' % ipaddress
-            stack['descr'] = 'libvirt node'
-            stack['type'] = 'LIBVIRT'
-            stack['status'] = 'ENABLED'
-            stack['name'] = j.system.net.getHostname()
-            stack['gid'] = j.application.whoAmI.gid
-            stack['referenceId'] = str(j.application.whoAmI.nid)
+            stack["id"] = None
+            stack["apiUrl"] = "qemu+ssh://%s/system" % ipaddress
+            stack["descr"] = "libvirt node"
+            stack["type"] = "LIBVIRT"
+            stack["status"] = "ENABLED"
+            stack["name"] = j.system.net.getHostname()
+            stack["gid"] = j.application.whoAmI.gid
+            stack["referenceId"] = str(j.application.whoAmI.nid)
             ccl.stack.set(stack)
 
-        
     def install(self):
         super(ComputeNode, self).install()
         if not self.config.update:
@@ -251,7 +265,7 @@ class ComputeNode(Node):
         self.install_portal_client()
         self.install_vncproxy()
         self.install_libvirtlistener()
-        self.install_scaleout_network()
+        self.install_network()
         self.install_cb_cpunode_aio()
         self.install_vfwnode()
 
@@ -260,95 +274,67 @@ class ComputeNode(Node):
 
     def install_libvirtlistener(self):
         self.register_service(self.libvirtlistener)
-    
+
     def install_portal_client(self):
         self.write_config(self.portal_client)
-        
-    def install_scaleout_network(self):
-        from JumpScale.lib import ovsnetconfig
+
+    def install_network(self):
         import libvirt
-        #configure the package
 
-        gw_mgmt_backplane = self.data_net['netconfig.gw_mgmt_backplane.interfacename']
-        vxbackend_backplane = self.data_net['netconfig.vxbackend.interfacename']
+        nics = j.system.net.getNics()
 
-        gw_mgmt_vlan = self.data_net['netconfig.gw_mgmt.vlanid']
-        vxbackend_vlan = self.data_net['netconfig.vxbackend.vlanid']
-
-        # removing existings ports and bridge
-        ports = j.system.process.execute("ovs-appctl dpif/show | awk '/patch/{print $1}'")[1]
-        if ports:
-            print("Cleaning openswitch bridges found")
-            ports = ports.strip().split("\n")
-
-            for port in ports:
-                j.system.process.execute("ovs-vsctl del-port %s" % port)
-
-            nics = j.system.net.getNics()
-            for network in ('public', 'vxbackend', 'gw_mgmt'):
-                if network in nics:
-                    j.system.process.execute("ovs-vsctl del-br %s" % network)
-
-        for network in ('vxbackend', 'gw_mgmt'):
-            key = 'netconfig.%s.ipaddr' % network
+        for network in ("gw_mgmt", "vxbackend"):
+            if network not in nics:
+                backplane = self.data_net[
+                    "netconfig.{}_backplane.interfacename".format(network)
+                ]
+                vlan = self.data_net["netconfig.{}.vlanid".format(network)]
+                j.system.ovsnetconfig.newVlanBridge(network, backplane, vlan, 1500)
+            key = "netconfig.%s.ipaddr" % network
             if self.data_net.get(key):
                 ip = self.data_net[key].strip()
                 if ip:
-                    mtu = None if network != 'vxbackend' else 2000
+                    mtu = None if network != "vxbackend" else 2000
                     j.system.ovsnetconfig.configureStaticAddress(network, ip, mtu=mtu)
 
-        j.system.ovsnetconfig.newVlanBridge('gw_mgmt', gw_mgmt_backplane, gw_mgmt_vlan)
-        j.system.ovsnetconfig.newVlanBridge('vxbackend', vxbackend_backplane, vxbackend_vlan,mtu=2000)
 
-        gwmgmtxml = '''
+        conn = libvirt.open()
+        networks = conn.listNetworks()
+        try:
+            if "default" in networks:
+                net = conn.networkLookupByName("default")
+                if net.isActive() != 0:
+                    net.destroy()
+                net.undefine()
+        except libvirt.libvirtError:
+            pass
+
+        gwmgmtxml = """
      <network>
             <name>gw_mgmt</name>
             <forward mode="bridge"/>
             <bridge name='gw_mgmt'/>
             <virtualport type='openvswitch'/>
-        </network>'''
-
-        mgmtxml = '''
-     <network>
-            <name>mgmt</name>
-            <forward mode="bridge"/>
-            <bridge name='backplane1'/>
-            <virtualport type='openvswitch'/>
-        </network>'''
-
-        conn = libvirt.open()
-
-        networks = conn.listAllNetworks()
-        for net in networks:
-            if net.isActive() != 0:
-                net.destroy()
-            try:
-                net.undefine()
-            except:
-                pass
-
-        private = conn.networkDefineXML(gwmgmtxml)
-        private.create()
-        private.setAutostart(True)
-
-        private = conn.networkDefineXML(mgmtxml)
-        private.create()
-        private.setAutostart(True)
+        </network>"""
+        if "gw_mgmt" not in networks:
+            private = conn.networkDefineXML(gwmgmtxml)
+            private.create()
+            private.setAutostart(True)
 
     def install_cb_cpunode_aio(self):
-        roles = j.application.config['grid']['node'].get('roles', [])
+        roles = j.application.config["grid"]["node"].get("roles", [])
         change = False
-        for role in ['cpunode', 'vfw']:
+        for role in ["cpunode", "vfw"]:
             if role not in roles:
                 change = True
                 roles.append(role)
         if change:
-            grid_conf = j.application.config['grid']
-            grid_conf['node']['roles'] = roles
-            j.core.config.set('system', 'grid', grid_conf)
+            grid_conf = j.application.config["grid"]
+            grid_conf["node"]["roles"] = roles
+            j.core.config.set("system", "grid", grid_conf)
 
-            self.restart_service('openvcloud_jsagent')
-        self.restart_service('nginx')
+            self.restart_service("openvcloud_jsagent")
+        self.restart_service("nginx")
 
 
 class StorageNode(Node):
@@ -358,7 +344,7 @@ class StorageNode(Node):
         self.prepare_config()
         if not config.update:
             self.install_packages()
-    
+
     def prepare_config(self):
         super(StorageNode, self).prepare_config()
         # self.data_storage = {
@@ -366,8 +352,8 @@ class StorageNode(Node):
         #     "param.master.addr": "",
         #     "param.grid.id": self.config.gid,
         #     }
-        self.redis['config']['maxram'] = 200
-    
+        self.redis["config"]["maxram"] = 200
+
     def install(self):
         self.install_cb_storagenode_aio()
         self.install_cb_storagedriver_aio()
@@ -376,48 +362,59 @@ class StorageNode(Node):
 
     def install_packages(self):
         if not j.do.exists("/etc/apt/sources.list.d/ovsaptrepo.list"):
-            j.do.writeFile("/etc/apt/sources.list.d/ovsaptrepo.list", "deb http://apt.openvstorage.com fargo main")
+            j.do.writeFile(
+                "/etc/apt/sources.list.d/ovsaptrepo.list",
+                "deb http://apt.openvstorage.com fargo main",
+            )
             content = """
 Package: *
 Pin: origin apt.openvstorage.com
 Pin-Priority: 1000
             """
             j.do.writeFile("/etc/apt/preferences", content)
-            j.do.execute("apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0F18F826B6183F53")
+            j.do.execute(
+                "apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0F18F826B6183F53"
+            )
             j.do.execute("apt-get update")
-        j.do.execute("apt-get install -y genisoimage nginx qemu-utils openvswitch-switch python-psutil openvstorage-health-check")
-
+        j.do.execute(
+            "apt-get install -y genisoimage nginx qemu-utils openvswitch-switch python-psutil openvstorage-health-check"
+        )
 
     def install_cb_storagenode_aio(self):
-        roles = j.application.config['grid']['node']['roles']
+        roles = j.application.config["grid"]["node"]["roles"]
         change = False
-        for role in ['storagenode']:
+        for role in ["storagenode"]:
             if role not in roles:
                 change = True
                 roles.append(role)
         if change:
-            j.application.config['grid']['node']['roles'] = roles
-            j.core.config.set('system', 'grid', j.application.config['grid'])
-            self.restart_service('openvcloud_jsagent')
+            j.application.config["grid"]["node"]["roles"] = roles
+            j.core.config.set("system", "grid", j.application.config["grid"])
+            self.restart_service("openvcloud_jsagent")
 
     def install_cb_storagedriver_aio(self):
-        roles = j.application.config['grid']['node']['roles']
+        roles = j.application.config["grid"]["node"]["roles"]
         change = False
-        storageroles = ['storagedriver']
-        if 'MASTER' in j.system.process.execute('ovs config get "ovs/framework/hosts/$(cat /etc/openvstorage_id)/type"')[1]:
-            storageroles.append('storagemaster')
+        storageroles = ["storagedriver"]
+        if (
+            "MASTER"
+            in j.system.process.execute(
+                'ovs config get "ovs/framework/hosts/$(cat /etc/openvstorage_id)/type"'
+            )[1]
+        ):
+            storageroles.append("storagemaster")
         else:
             # remove nginx config
-            j.system.fs.remove('/etc/nginx/sites-enabled/storagedriver_aio')
+            j.system.fs.remove("/etc/nginx/sites-enabled/storagedriver_aio")
         for role in storageroles:
             if role not in roles:
                 change = True
                 roles.append(role)
         if change:
-            j.application.config['grid']['node']['roles'] = roles
-            j.core.config.set('system', 'grid', j.application.config['grid'])
-            self.restart_service('openvcloud_jsagent')
-        self.restart_service('nginx')
+            j.application.config["grid"]["node"]["roles"] = roles
+            j.core.config.set("system", "grid", j.application.config["grid"])
+            self.restart_service("openvcloud_jsagent")
+        self.restart_service("nginx")
 
     def configure_iyo_api_key(self, apikey):
         label = apikey["label"]
@@ -463,14 +460,20 @@ Pin-Priority: 1000
         return apikey
 
     def patch_ovs(self):
-        _, output, _ = j.do.execute('ovs config get "ovs/framework/hosts/$(cat /etc/openvstorage_id)/type"')
+        _, output, _ = j.do.execute(
+            'ovs config get "ovs/framework/hosts/$(cat /etc/openvstorage_id)/type"'
+        )
 
         if "MASTER" in output:
-            j.do.execute("python /opt/code/github/0-complexity/openvcloud/scripts/ovs/alba-create-user.py")
-            ovscallbackurl = "https://ovs-{}/api/oauth2/redirect/".format(self.config.fqdn)
+            j.do.execute(
+                "python /opt/code/github/0-complexity/openvcloud/scripts/ovs/alba-create-user.py"
+            )
+            ovscallbackurl = "https://ovs-{}/api/oauth2/redirect/".format(
+                self.config.fqdn
+            )
             apikey = {
                 "label": "ovs-{}".format(self.config.env_subdomain),
-                "clientCredentialsGrantType": False, 
+                "clientCredentialsGrantType": False,
                 "callbackURL": ovscallbackurl,
             }
             apikey = self.configure_iyo_api_key(apikey)
@@ -486,78 +489,101 @@ Pin-Priority: 1000
             }
 
             def _configure(data_oauth):
-                DJANGO_SETTINGS = '/opt/OpenvStorage/webapps/api/settings.py'
-                j.do.execute('''sed -i.bak "s/^ALLOWED_HOSTS.*$/ALLOWED_HOSTS = ['*']/" %s''' % DJANGO_SETTINGS)
-                if data_oauth.get('oauth.id') != '':
+                DJANGO_SETTINGS = "/opt/OpenvStorage/webapps/api/settings.py"
+                j.do.execute(
+                    """sed -i.bak "s/^ALLOWED_HOSTS.*$/ALLOWED_HOSTS = ['*']/" %s"""
+                    % DJANGO_SETTINGS
+                )
+                if data_oauth.get("oauth.id") != "":
                     import sys
-                    sys.path.append('/opt/OpenvStorage')
+
+                    sys.path.append("/opt/OpenvStorage")
                     try:
                         from ovs.extensions.generic.configuration import Configuration
                         import functools
+
                         setdata = functools.partial(Configuration.set, raw=True)
                     except ImportError:
                         import etcd
+
                         setdata = etcd.Client(port=2379).set
                     # setting up ovs.json
-                    clientid = data_oauth.get('instance.oauth.id')
-                    config = {"html_endpoint": "/",
-                                'oauth2':
-                                {
-                                    'mode': 'remote',
-                                    'authorize_uri': data_oauth.get('authorize_uri'),
-                                    'token_uri': data_oauth.get('token_uri'),
-                                    'client_id': clientid,
-                                    'client_secret': data_oauth.get('secret'),
-                                    'scope': 'user:memberof:{}.ovs_admin'.format(clientid)
-                                }
-                                }
-                    setdata('/ovs/framework/webapps', json.dumps(config))
+                    clientid = data_oauth.get("instance.oauth.id")
+                    config = {
+                        "html_endpoint": "/",
+                        "oauth2": {
+                            "mode": "remote",
+                            "authorize_uri": data_oauth.get("authorize_uri"),
+                            "token_uri": data_oauth.get("token_uri"),
+                            "client_id": clientid,
+                            "client_secret": data_oauth.get("secret"),
+                            "scope": "user:memberof:{}.ovs_admin".format(clientid),
+                        },
+                    }
+                    setdata("/ovs/framework/webapps", json.dumps(config))
 
-                j.system.platform.ubuntu.restartService('ovs-webapp-api')
+                j.system.platform.ubuntu.restartService("ovs-webapp-api")
+
             _configure(data_oauth)
             openvstorage_oauth = {
-            "config": 
-                data_oauth
-                ,
-                "domain": 'openvcloud',
+                "config": data_oauth,
+                "domain": "openvcloud",
                 "servicename": "openvstorage_oauth",
-                "instance": "main"
+                "instance": "main",
             }
 
             self.write_config(openvstorage_oauth)
 
 
-
 if __name__ == "__main__":
 
     from argparse import ArgumentParser
+
     parser = ArgumentParser()
-    parser.add_argument("-r", "--roles", nargs="+", dest="roles", required=True,
-                        help="node roles")
-    parser.add_argument("-mips", "--masterips", nargs="+", dest="masterips", required=True,
-                        help="master ips")
+    parser.add_argument(
+        "-r", "--roles", nargs="+", dest="roles", required=True, help="node roles"
+    )
+    parser.add_argument(
+        "-mips",
+        "--masterips",
+        nargs="+",
+        dest="masterips",
+        required=True,
+        help="master ips",
+    )
     parser.add_argument("-p", "--password", dest="password", help="Password")
     parser.add_argument("-gid", "--gid", dest="gid", help="GID", required=True)
     parser.add_argument("-fqdn", "--fqdn", dest="fqdn", required=True, help="FQDN")
-    parser.add_argument("-vxbackend_vlan", "--vxbackend_vlan", dest="vxbackend_vlan",
-                        help="vxbackend_vlan")
-    parser.add_argument("-vxbackend_ip", "--vxbackend_ip", dest="vxbackend_ip",
-                        help="vxbackend_ip")
-    parser.add_argument("-gwmgmt_vlan", "--gwmgmt_vlan", dest="gwmgmt_vlan", help="gwmgmt_vlan")
+    parser.add_argument(
+        "-vxbackend_vlan",
+        "--vxbackend_vlan",
+        dest="vxbackend_vlan",
+        help="vxbackend_vlan",
+    )
+    parser.add_argument(
+        "-vxbackend_ip", "--vxbackend_ip", dest="vxbackend_ip", help="vxbackend_ip"
+    )
+    parser.add_argument(
+        "-gwmgmt_vlan", "--gwmgmt_vlan", dest="gwmgmt_vlan", help="gwmgmt_vlan"
+    )
     parser.add_argument("-gwmgmt_ip", "--gwmgmt_ip", dest="gwmgmt_ip", help="gwmgmt_ip")
     parser.add_argument("-grid_id", "--grid_id", dest="grid_id", help="grid_id")
-    parser.add_argument("-env_subdomain", "--env_subdomain", dest="env_subdomain", help="env_subdomain")
-    parser.add_argument("-client_id", "--client_id", dest="client_id",
-                        help="itsyouonline client_id ")
-    parser.add_argument("-secret", "--secret", dest="secret",
-                        help="itsyouonline Secret")
-    parser.add_argument('--update', help='Update', action='store_true')                        
+    parser.add_argument(
+        "-env_subdomain", "--env_subdomain", dest="env_subdomain", help="env_subdomain"
+    )
+    parser.add_argument(
+        "-client_id", "--client_id", dest="client_id", help="itsyouonline client_id "
+    )
+    parser.add_argument(
+        "-secret", "--secret", dest="secret", help="itsyouonline Secret"
+    )
+    parser.add_argument("--update", help="Update", action="store_true")
 
     config = parser.parse_args()
-    
-    if 'cpu' in config.roles:
+
+    if "cpu" in config.roles:
         node = ComputeNode(config)
-    elif 'storage' in config.roles:
+    elif "storage" in config.roles:
         node = StorageNode(config)
     else:
         node = Node(config)
