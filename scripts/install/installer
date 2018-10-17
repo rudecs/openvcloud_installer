@@ -1432,7 +1432,7 @@ def kube_apply_all(ctx):
     """
     Rewrite kube resources from template
     """
-    cluster = Cluster(ctx.obj["config"], ctx.obj["vesions"])
+    cluster = Cluster(ctx.obj["config"], ctx.obj["versions"])
     cluster.kube_deploy()
 
 
