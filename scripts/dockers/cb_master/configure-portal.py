@@ -20,6 +20,8 @@ class Portal(object):
             raise RuntimeError("clientId is not set")
         if not self.config["itsyouonline"].get("clientSecret"):
             raise RuntimeError("clientSecret is not set")
+        if not self.config["itsyouonline"].get("iyoURL"):
+            raise RuntimeError("iyoURL is not set")
 
         self.client_id = self.config["itsyouonline"]["clientId"]
         self.client_secret = self.config["itsyouonline"]["clientSecret"]
@@ -28,7 +30,8 @@ class Portal(object):
             self.config["environment"]["basedomain"],
         )
         # baseurl = "https://staging.itsyou.online/"
-        self.baseurl = "https://itsyou.online/"
+        self.baseurl = self.config["itsyouonline"]["iyoURL"]
+#        self.baseurl = "https://itsyou.online/"
         self.scl = j.clients.osis.getNamespace("system")
         self.ccl = j.clients.osis.getNamespace("cloudbroker")
         self.lcl = j.clients.osis.getNamespace("libvirt")
