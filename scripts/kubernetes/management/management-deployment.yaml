@@ -16,7 +16,7 @@ spec:
       containers:
       - name: management-container
         imagePullPolicy: Always
-        image: openvcloud/management
+        image: rudecs/management
         command: ['/bin/bash']
         args: ['-c', 'python3 /var/run/init-ssh.py && /sbin/my_init']
         env:
