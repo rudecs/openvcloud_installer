@@ -33,12 +33,12 @@ BASE_IMAGE_EXCLUDE = [
 ]
 
 Version = namedtuple("Version", ("version", "type"))
-REPO_URL = "https://github.com/0-complexity/openvcloud_installer"
+REPO_URL = "https://github.com/rudecs/openvcloud_installer"
 DEV_REPOS = [
-    "https://github.com/0-complexity/openvcloud",
-    "https://github.com/0-complexity/selfhealing",
-    "https://github.com/jumpscale7/jumpscale_core7",
-    "https://github.com/jumpscale7/jumpscale_portal",
+    "https://github.com/rudecs/openvcloud",
+    "https://github.com/rudecs/selfhealing",
+    "https://github.com/rudecs/jumpscale_core7",
+    "https://github.com/rudecs/jumpscale_portal",
 ]
 REPO_PATH = "/opt/code/github/0-complexity/openvcloud_installer"
 DEV_TMPLS = ["osis", "agentcontroller", "portal"]
