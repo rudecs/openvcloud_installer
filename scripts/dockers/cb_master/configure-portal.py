@@ -19,12 +19,14 @@ class Portal(object):
             raise RuntimeError('clientId is not set')
         if not self.config['itsyouonline'].get('clientSecret'):
             raise RuntimeError('clientSecret is not set')
+        if not self.config['itsyouonline'].get('IYOurl'):
+            raise RuntimeError('IYOurl is not set')
 
         self.client_id = self.config['itsyouonline']['clientId']
         self.client_secret = self.config['itsyouonline']['clientSecret']
         self.fqdn = '%s.%s' % (self.config['environment']['subdomain'], self.config['environment']['basedomain'])
+        self.baseurl = self.config['itsyouonline']['IYOurl']
         # baseurl = "https://staging.itsyou.online/"
-        self.baseurl = "https://itsyou.online/"
 
     @property
     def authheaders(self):

@@ -21,12 +21,30 @@ class Actions(ActionsBase):
     step7b: do monitor_local to see if package healthy installed & running
     step7c: do monitor_remote to see if package healthy installed & running, but this time test is done from central location
     """
+
+    def __init__(self, path='/opt/cfg/system/system-config.yaml'):
+        with open(path) as file_discriptor:
+            data = yaml.load(file_discriptor)
+        self.config = data
+        self.__authheaders = None
+        if not self.config['itsyouonline'].get('clientId'):
+            raise RuntimeError('clientId is not set')
+        if not self.config['itsyouonline'].get('clientSecret'):
+            raise RuntimeError('clientSecret is not set')
+        if not self.config['itsyouonline'].get('IYOurl'):
+            raise RuntimeError('IYOurl is not set')
+
+        self.client_id = self.config['itsyouonline']['clientId']
+        self.client_secret = self.config['itsyouonline']['clientSecret']
+        self.fqdn = '%s.%s' % (self.config['environment']['subdomain'], self.config['environment']['basedomain'])
+        self.baseurl = self.config['itsyouonline']['IYOurl']
+
     def prepare(self, serviceObj):
         self.__authheaders = None
         self.client_id = serviceObj.hrd.get('instance.param.client_id')
         self.client_secret = serviceObj.hrd.get('instance.param.client_secret')
         # baseurl = "https://staging.itsyou.online/"
-        self.baseurl = "https://itsyou.online/"
+#        self.baseurl = "https://itsyou.online/"
 
     @property
     def authheaders(self):
