@@ -552,7 +552,8 @@ class Node(AbstractConfig):
         self.fqdn = "{}.{}".format(
             config["environment"]["subdomain"], config["environment"]["basedomain"]
         )
-        self.iyourl = "https://itsyou.online/"
+        self.iyourl = config["itsyouonline"]["iyoURL"]
+#        self.iyourl = "https://itsyou.online/"
         self.fs_path = fs_path
 
     def log(self, msg):
